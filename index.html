@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- 검색엔진 색인 제외 -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#FFFFFF">
+<!-- 홈 화면에 추가하면 주소창 없이 전체화면으로 뜬다 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="좌표 수집">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<title>좌표 수집기</title>
+<style>
+  html,body{height:100%;}
+  body{padding-bottom:env(safe-area-inset-bottom);}
+  img{max-width:100%;}
+</style>
+<style>
+  /* 현장용 도구 — 직사광선에서 읽혀야 하므로 밝은 화면으로 고정한다.
+     웹폰트를 쓰지 않는다: 신호가 약한 곳에서도 즉시 떠야 한다. */
+  :root{
+    --paper:#FFFFFF;
+    --panel:#F1F3F6;
+    --panel-2:#E7EAEF;
+    --ink:#12161A;
+    --ink-2:#545C66;
+    --ink-3:#7C858F;
+    --line:#D5DAE1;
+    --accent:#0B5FA5;
+    --ok:#136B3E;
+    --ok-bg:#E2F1E8;
+    --warn:#8F5A00;
+    --warn-bg:#FBEFD8;
+    --bad:#A81E17;
+    --bad-bg:#FBE4E2;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0;background:var(--paper);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",system-ui,sans-serif;
+    font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;
+  }
+  .num{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums;}
+  .wrap{max-width:520px;margin:0 auto;padding:18px 16px 56px;}
+
+  header{margin-bottom:18px;}
+  h1{font-size:20px;font-weight:700;margin:0 0 4px;letter-spacing:-.01em;}
+  .sub{margin:0;font-size:13.5px;color:var(--ink-2);}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;}
+  .card.tight{padding:13px 15px;}
+  .card h2{font-size:14px;font-weight:700;margin:0 0 10px;letter-spacing:.01em;}
+
+  .banner{border-radius:12px;padding:14px 16px;margin-bottom:14px;font-size:14.5px;line-height:1.62;}
+  .banner b{display:block;font-size:15.5px;margin-bottom:5px;}
+  .banner.ok{background:var(--ok-bg);color:var(--ok);border:1px solid #B9DCC8;}
+  .banner.warn{background:var(--warn-bg);color:var(--warn);border:1px solid #EBD3A2;}
+  .banner.bad{background:var(--bad-bg);color:var(--bad);border:1px solid #F0BDB8;}
+
+  button{
+    font-family:inherit;font-size:16px;font-weight:600;
+    border:1px solid transparent;border-radius:10px;
+    padding:13px 16px;cursor:pointer;background:var(--panel-2);color:var(--ink);
+  }
+  button:focus-visible{outline:3px solid var(--accent);outline-offset:2px;}
+  button:disabled{opacity:.45;cursor:default;}
+  .primary{
+    width:100%;background:var(--accent);color:#fff;border-color:var(--accent);
+    font-size:19px;font-weight:700;padding:20px 16px;border-radius:12px;
+  }
+  .danger{background:var(--bad-bg);color:var(--bad);border-color:#F0BDB8;}
+  .ghost{background:transparent;border-color:var(--line);color:var(--ink-2);font-size:14px;padding:9px 13px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+
+  /* 측정 화면 */
+  .measure{text-align:center;padding:8px 0 4px;}
+  .big{font-size:44px;font-weight:700;line-height:1.1;letter-spacing:-.02em;}
+  .big small{font-size:18px;font-weight:600;color:var(--ink-2);margin-left:3px;}
+  .bar{height:8px;background:var(--panel-2);border-radius:99px;overflow:hidden;margin:14px 0 4px;}
+  .bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .35s linear;}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-top:14px;}
+  .grid div{background:var(--panel);padding:10px 12px;}
+  .grid dt{font-size:11px;letter-spacing:.06em;color:var(--ink-3);margin-bottom:2px;text-transform:uppercase;}
+  .grid dd{margin:0;font-size:17px;font-weight:600;}
+
+  .coord{font-size:19px;font-weight:600;letter-spacing:-.01em;word-break:break-all;}
+
+  label{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin:14px 0 6px;}
+  input[type=text]{
+    width:100%;font-family:inherit;font-size:17px;padding:13px 14px;
+    border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);
+  }
+  input[type=text]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(11,95,165,.16);}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px;}
+  .chip{font-size:13.5px;font-weight:500;padding:8px 12px;border-radius:99px;
+        background:var(--paper);border:1px solid var(--line);color:var(--ink-2);}
+
+  /* 저장 목록 */
+  .item{border-bottom:1px solid var(--line);padding:12px 0;}
+  .item:last-child{border-bottom:0;padding-bottom:0;}
+  .item-top{display:flex;justify-content:space-between;align-items:baseline;gap:10px;}
+  .item-name{font-weight:600;font-size:16px;}
+  .item-meta{font-size:12.5px;color:var(--ink-3);white-space:nowrap;}
+  .item-coord{font-size:14px;color:var(--ink-2);margin-top:2px;}
+  .tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:.03em;}
+  .tag.ok{background:var(--ok-bg);color:var(--ok);}
+  .tag.warn{background:var(--warn-bg);color:var(--warn);}
+  .tag.bad{background:var(--bad-bg);color:var(--bad);}
+
+  textarea{
+    width:100%;height:170px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:12.5px;line-height:1.55;padding:12px;border:1px solid var(--line);
+    border-radius:10px;background:var(--paper);color:var(--ink);resize:vertical;
+  }
+  .empty{color:var(--ink-3);font-size:14.5px;margin:0;}
+  .hint{font-size:13px;color:var(--ink-3);margin:8px 0 0;line-height:1.6;}
+  ol{margin:8px 0 0;padding-left:20px;font-size:14px;color:var(--ink-2);}
+  ol li{margin-bottom:6px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>좌표 수집기</h1>
+    <p class="sub">현장에서 재는 위도·경도</p>
+  </header>
+
+  <div id="perm"></div>
+
+  <div id="stage"></div>
+
+  <div class="card" id="saved-card">
+    <h2>저장한 지점 <span id="count" class="num" style="color:var(--ink-3);font-weight:600;"></span></h2>
+    <div id="saved"><p class="empty">아직 없습니다.</p></div>
+  </div>
+
+  <div class="card" id="export-card" hidden>
+    <h2>내보내기</h2>
+    <p class="hint" style="margin:0 0 10px;">아래를 통째로 복사해서 저에게 붙여넣으세요.</p>
+    <textarea id="out" readonly></textarea>
+    <div class="row" style="margin-top:10px;">
+      <button class="ghost" id="copy">복사</button>
+      <button class="ghost danger" id="clear">전체 삭제</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var KEY = "gyeongju:points:v1";
+  var DURATION = 30000;          // 한 지점 측정 시간
+  var NAMES = ["천마총","첨성대","계림","월성","석빙고","동궁과 월지"];
+
+  var permEl = document.getElementById("perm");
+  var stageEl = document.getElementById("stage");
+  var savedEl = document.getElementById("saved");
+  var countEl = document.getElementById("count");
+  var exportCard = document.getElementById("export-card");
+  var outEl = document.getElementById("out");
+
+  var points = load();
+  var watchId = null, timerId = null, tickId = null, wakeLock = null;
+  var samples = [], startedAt = 0, pending = null;
+  var dropouts = 0, denied = false;
+
+  /* ---------- 저장 ---------- */
+  function load(){
+    try{ var raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : []; }
+    catch(e){ return []; }
+  }
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify(points)); }
+    catch(e){ /* 저장 실패해도 화면 상태는 유지된다 */ }
+  }
+
+  /* ---------- 계산 ---------- */
+  function summarize(list){
+    if(!list.length) return null;
+    var sw=0, slat=0, slon=0, i, w;
+    for(i=0;i<list.length;i++){
+      w = 1 / Math.pow(Math.max(list[i].acc, 1), 2);   // 정확도 나쁜 표본은 가볍게
+      sw += w; slat += list[i].lat * w; slon += list[i].lon * w;
+    }
+    var lat = slat/sw, lon = slon/sw;
+    var mlat = 111320, mlon = 111320 * Math.cos(lat * Math.PI/180);
+    var spread = 0, best = Infinity, sum = 0, d;
+    for(i=0;i<list.length;i++){
+      d = Math.sqrt(Math.pow((list[i].lat-lat)*mlat,2) + Math.pow((list[i].lon-lon)*mlon,2));
+      if(d > spread) spread = d;
+      if(list[i].acc < best) best = list[i].acc;
+      sum += list[i].acc;
+    }
+    return { lat:lat, lon:lon, n:list.length, best:best, avg:sum/list.length, spread:spread };
+  }
+
+  function grade(s){
+    if(s.best <= 10 && s.spread <= 15) return { key:"ok",   label:"좋음" };
+    if(s.best <= 20 && s.spread <= 30) return { key:"warn", label:"보통" };
+    return { key:"bad", label:"다시" };
+  }
+
+  /* ---------- 권한 ---------- */
+  function showPerm(state, detail){
+    if(state === "ok"){ permEl.innerHTML = ""; return; }
+    if(state === "unsupported"){
+      permEl.innerHTML = '<div class="banner bad"><b>이 브라우저는 위치를 읽지 못합니다</b>' +
+        '사진 방식으로 진행하세요. 유물 앞에서 3장씩 찍으시면 됩니다.</div>';
+    } else if(state === "denied"){
+      permEl.innerHTML = '<div class="banner bad"><b>위치 권한이 막혔습니다</b>' +
+        (detail || "") + '<br><br>사파리 주소창의 <b style="display:inline">ᴀA</b> → 웹사이트 설정 → 위치에서 허용으로 바꿔보세요. ' +
+        '그래도 안 되면 사진 방식으로 가시면 됩니다.</div>';
+    } else if(state === "timeout"){
+      permEl.innerHTML = '<div class="banner warn"><b>위치를 잡지 못했습니다</b>' +
+        '실내이거나 신호가 약할 수 있습니다. 하늘이 보이는 곳으로 나가서 다시 시도해보세요.</div>';
+    }
+  }
+
+  /* ---------- 화면 ---------- */
+  function renderIdle(){
+    stageEl.innerHTML =
+      '<div class="card">' +
+        '<button class="primary" id="go">여기 좌표 재기</button>' +
+        '<p class="hint">유물이 <b style="display:inline">보이는 자리</b>에 서서 누르세요. ' +
+        '30초 동안 움직이지 말고 폰을 들고 계시면 됩니다.</p>' +
+      '</div>';
+    document.getElementById("go").addEventListener("click", start);
+  }
+
+  function renderMeasuring(){
+    var s = summarize(samples);
+    var left = Math.max(0, Math.ceil((DURATION - (Date.now() - startedAt)) / 1000));
+    var pct = Math.min(100, ((Date.now() - startedAt) / DURATION) * 100);
+    stageEl.innerHTML =
+      '<div class="card">' +
+        '<div class="measure">' +
+          '<div class="big num">' + left + '<small>초 남음</small></div>' +
+          '<div class="bar"><i style="width:' + pct + '%"></i></div>' +
+          '<p class="hint" style="margin-top:10px;">움직이지 마세요. 표본을 모으는 중입니다.</p>' +
+        '</div>' +
+        '<div class="grid">' +
+          '<div><dt>표본</dt><dd class="num">' + samples.length + '개</dd></div>' +
+          '<div><dt>정확도</dt><dd class="num">' + (s ? Math.round(s.best) + " m" : "…") + '</dd></div>' +
+        '</div>' +
+        (dropouts ? '<p class="hint" style="color:var(--warn);">신호가 ' + dropouts +
+                    '번 끊겼습니다. 그대로 계속 모으는 중입니다.</p>' : '') +
+        '<div style="display:none">' +
+        '</div>' +
+        '<div class="row" style="margin-top:12px;">' +
+          '<button class="ghost" id="abort">그만두기</button>' +
+        '</div>' +
+      '</div>';
+    document.getElementById("abort").addEventListener("click", function(){ stop(); renderIdle(); });
+  }
+
+  function renderReview(){
+    var s = pending, g = grade(s);
+    var chips = NAMES.map(function(n){
+      return '<button class="chip" data-name="' + n + '">' + n + '</button>';
+    }).join("");
+    stageEl.innerHTML =
+      '<div class="card">' +
+        '<h2>측정 결과 <span class="tag ' + g.key + '">' + g.label + '</span></h2>' +
+        '<div class="coord num">' + s.lat.toFixed(6) + ', ' + s.lon.toFixed(6) + '</div>' +
+        '<div class="grid">' +
+          '<div><dt>가장 좋은 정확도</dt><dd class="num">' + Math.round(s.best) + ' m</dd></div>' +
+          '<div><dt>표본이 흩어진 폭</dt><dd class="num">' + s.spread.toFixed(1) + ' m</dd></div>' +
+          '<div><dt>표본 수</dt><dd class="num">' + s.n + '개</dd></div>' +
+          '<div><dt>평균 정확도</dt><dd class="num">' + Math.round(s.avg) + ' m</dd></div>' +
+        '</div>' +
+        (g.key === "bad"
+          ? '<div class="banner warn" style="margin:14px 0 0;"><b>다시 재는 걸 권합니다</b>' +
+            '신호가 불안정합니다. 나무 아래나 건물 옆이면 몇 걸음 옮겨보세요.</div>'
+          : "") +
+        '<label for="nm">이 지점 이름</label>' +
+        '<input type="text" id="nm" placeholder="예: 천마총 관람 위치" autocomplete="off">' +
+        '<div class="chips">' + chips + '</div>' +
+        '<div class="row" style="margin-top:16px;">' +
+          '<button class="primary" style="flex:1;font-size:17px;padding:15px;" id="keep">저장</button>' +
+          '<button class="ghost" id="redo">다시 재기</button>' +
+          '<button class="ghost" id="drop">버리기</button>' +
+        '</div>' +
+      '</div>';
+
+    var nm = document.getElementById("nm");
+    Array.prototype.forEach.call(stageEl.querySelectorAll(".chip"), function(c){
+      c.addEventListener("click", function(){ nm.value = c.getAttribute("data-name"); nm.focus(); });
+    });
+    document.getElementById("keep").addEventListener("click", function(){
+      points.push({
+        name: nm.value.trim() || ("이름없음 " + (points.length + 1)),
+        lat: s.lat, lon: s.lon, best: s.best, avg: s.avg,
+        spread: s.spread, n: s.n, at: new Date().toISOString()
+      });
+      save(); pending = null; renderSaved(); renderIdle();
+    });
+    document.getElementById("redo").addEventListener("click", function(){ pending = null; start(); });
+    document.getElementById("drop").addEventListener("click", function(){ pending = null; renderIdle(); });
+  }
+
+  function renderSaved(){
+    countEl.textContent = points.length ? points.length + "개" : "";
+    if(!points.length){
+      savedEl.innerHTML = '<p class="empty">아직 없습니다.</p>';
+      exportCard.hidden = true;
+      return;
+    }
+    savedEl.innerHTML = points.map(function(p, i){
+      var g = grade(p);
+      return '<div class="item">' +
+        '<div class="item-top">' +
+          '<span class="item-name">' + escape_(p.name) + '</span>' +
+          '<span class="item-meta"><span class="tag ' + g.key + '">' + g.label + '</span> ' +
+            '<span class="num">±' + Math.round(p.best) + 'm</span></span>' +
+        '</div>' +
+        '<div class="item-coord num">' + p.lat.toFixed(6) + ', ' + p.lon.toFixed(6) +
+          ' · 표본 ' + p.n + ' · 흩어짐 ' + p.spread.toFixed(1) + 'm</div>' +
+        '<button class="ghost" data-del="' + i + '" style="margin-top:8px;padding:6px 11px;font-size:13px;">삭제</button>' +
+      '</div>';
+    }).join("");
+    Array.prototype.forEach.call(savedEl.querySelectorAll("[data-del]"), function(b){
+      b.addEventListener("click", function(){
+        points.splice(parseInt(b.getAttribute("data-del"), 10), 1);
+        save(); renderSaved();
+      });
+    });
+    exportCard.hidden = false;
+    outEl.value = buildExport();
+  }
+
+  function escape_(t){
+    return String(t).replace(/[&<>"]/g, function(c){
+      return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c];
+    });
+  }
+
+  function buildExport(){
+    var lines = ["경주 탐험대 — 현장 실측 좌표", "측정 " + new Date().toLocaleString("ko-KR"), ""];
+    points.forEach(function(p){
+      lines.push(p.name);
+      lines.push("  coords: { latitude: " + p.lat.toFixed(6) + ", longitude: " + p.lon.toFixed(6) + " },");
+      lines.push("  // 정확도 ±" + Math.round(p.best) + "m · 표본 " + p.n +
+                 "개 · 흩어짐 " + p.spread.toFixed(1) + "m · " + grade(p).label);
+      lines.push("");
+    });
+    return lines.join("\n");
+  }
+
+  /* ---------- 측정 ---------- */
+  function start(){
+    if(!navigator.geolocation){ showPerm("unsupported"); return; }
+    samples = []; startedAt = Date.now(); pending = null; dropouts = 0; denied = false;
+    permEl.innerHTML = "";
+    renderMeasuring();
+
+    if(navigator.wakeLock && navigator.wakeLock.request){
+      navigator.wakeLock.request("screen").then(function(w){ wakeLock = w; }, function(){});
+    }
+
+    watchId = navigator.geolocation.watchPosition(function(pos){
+      samples.push({ lat: pos.coords.latitude, lon: pos.coords.longitude,
+                     acc: pos.coords.accuracy || 999 });
+    }, function(err){
+      // code 1(권한 거부)만 치명적이다. code 2(신호 끊김)·3(시간 초과)은
+      // 나무 아래나 건물 옆에서 수시로 뜨고 곧 회복된다 — 여기서 멈추면 안 된다.
+      if(err.code === 1){
+        denied = true; stop(); showPerm("denied"); renderIdle(); return;
+      }
+      dropouts++;
+    }, { enableHighAccuracy:true, maximumAge:0, timeout:DURATION });
+
+    tickId = setInterval(function(){ if(watchId !== null) renderMeasuring(); }, 1000);
+    timerId = setTimeout(finish, DURATION);
+  }
+
+  function stop(){
+    if(watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+    if(timerId){ clearTimeout(timerId); timerId = null; }
+    if(tickId){ clearInterval(tickId); tickId = null; }
+    if(wakeLock){ try{ wakeLock.release(); }catch(e){} wakeLock = null; }
+  }
+
+  function finish(){
+    var s = summarize(samples);
+    stop();
+    if(denied) return;
+    if(!s){ showPerm("timeout"); renderIdle(); return; }
+    s.dropouts = dropouts;
+    pending = s;
+    renderReview();
+  }
+
+  /* ---------- 내보내기 ---------- */
+  document.getElementById("copy").addEventListener("click", function(){
+    outEl.removeAttribute("readonly");
+    outEl.select(); outEl.setSelectionRange(0, 999999);
+    var done = false;
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(outEl.value).then(function(){ done = true; }, function(){});
+    }
+    try{ document.execCommand("copy"); done = true; }catch(e){}
+    outEl.setAttribute("readonly", "readonly");
+    this.textContent = done ? "복사됨" : "직접 선택해 복사하세요";
+    var b = this;
+    setTimeout(function(){ b.textContent = "복사"; }, 1800);
+  });
+
+  document.getElementById("clear").addEventListener("click", function(){
+    if(!points.length) return;
+    if(window.confirm("저장한 " + points.length + "개를 모두 지웁니다. 계속할까요?")){
+      points = []; save(); renderSaved();
+    }
+  });
+
+  /* ---------- 시작 ---------- */
+  if(!navigator.geolocation){
+    showPerm("unsupported");
+    stageEl.innerHTML = '<div class="card"><p class="empty">위치 기능을 쓸 수 없습니다.</p></div>';
+  } else {
+    permEl.innerHTML =
+      '<div class="banner ok"><b>먼저 이걸 확인하세요</b>' +
+      '아래 버튼을 누르면 위치 권한을 물어봅니다. <b style="display:inline">허용</b>이 뜨고 초 세기가 시작되면 이 도구를 쓸 수 있습니다. ' +
+      '권한 창이 아예 안 뜨거나 막히면 사진 방식으로 가시면 됩니다.</div>';
+    renderIdle();
+  }
+  renderSaved();
+})();
+</script>
+</body>
+</html>
